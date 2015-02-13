@@ -2,6 +2,7 @@
 
 namespace BCC\ResqueBundle;
 
+use BCC\ResqueBundle\Entity\ResqueJob;
 use Psr\Log\NullLogger;
 
 class Resque
@@ -26,9 +27,15 @@ class Resque
      */
     private $jobRetryStrategy = array();
 
-    public function __construct(array $kernelOptions)
+    /**
+     * @var $em \Doctrine\ORM\EntityManager
+     */
+    public $em;
+
+    public function __construct(array $kernelOptions, $em)
     {
         $this->kernelOptions = $kernelOptions;
+        $this->em = $em;
     }
 
     public function setPrefix($prefix)
@@ -63,7 +70,7 @@ class Resque
         return $this->redisConfiguration;
     }
 
-    public function enqueue(Job $job, $trackStatus = false)
+    public function enqueue(Job $job)
     {
         if ($job instanceof ContainerAwareJob) {
             $job->setKernelOptions($this->kernelOptions);
@@ -71,13 +78,20 @@ class Resque
 
         $this->attachRetryStrategy($job);
 
-        $result = \Resque::enqueue($job->queue, \get_class($job), $job->args, $trackStatus);
+        $resqueJob = new ResqueJob();
+        $resqueJob->setQueue($job->queue);
+        $resqueJob->setCreatedAt(new \DateTime('now'));
+        $resqueJob->setState(ResqueJob::STATE_PENDING);
+        $this->em->persist($resqueJob);
+        $this->em->flush();
 
-        if ($trackStatus) {
-            return new \Resque_Job_Status($result);
-        }
+        $result = \Resque::enqueue($job->queue, \get_class($job), $job->args, true);
 
-        return null;
+        $resqueJob->setResqueUUID($result);
+        $this->em->persist($resqueJob);
+        $this->em->flush();
+
+        return $resqueJob;
     }
 
     public function enqueueOnce(Job $job, $trackStatus = false)
@@ -249,6 +263,14 @@ class Resque
 
         return $result;
     }
+
+    public function getJob($jobId)
+    {
+        $job = \Resque::redis()->get('job:'.$jobId.':status');
+
+        return $job;
+    }
+
 
     /**
      * Attach any applicable retry strategy to the job.

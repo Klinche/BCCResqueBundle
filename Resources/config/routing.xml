@@ -23,4 +23,8 @@
     <route id="BCCResqueBundle_scheduled_timestamp" pattern="/scheduled/{timestamp}">
         <default key="_controller">BCCResqueBundle:Default:showTimestamp</default>
     </route>
+
+    <route id="BCCResqueBundle_job" pattern="/{jobId}">
+        <default key="_controller">BCCResqueBundle:Default:showJob</default>
+    </route>
 </routes>

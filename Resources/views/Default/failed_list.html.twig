@@ -19,14 +19,14 @@
                 {% for job in jobs %}
                 <tr>
                     <td class="span1">{{ job.queueName }}</td>
-                    <td class="span2">{{ job.failedAt }}</td>
+                    <td class="span2"><a href="{{ path('BCCResqueBundle_job', {jobId: job.id}) }}">{{ job.failedAt }}</a></td>
                     <td class="span4">{{ job.name }}</td>
                     <td class="span5">
                         {{ job.exceptionClass }}<br>
                         {{ job.error }}
                     </td>
                     <td class="span5">
-                        <pre>{{ job.backtrace |json_encode() }}</pre><br>
+                        <pre>{{ job.backtrace |json_encode(constant('JSON_PRETTY_PRINT')) }}</pre><br>
                     </td>
                 </tr>
                 {% else %}

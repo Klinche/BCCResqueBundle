@@ -2,6 +2,7 @@
 
 namespace BCC\ResqueBundle;
 
+use BCC\ResqueBundle\Entity\ResqueJob;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -12,6 +13,11 @@ abstract class ContainerAwareJob extends Job
      * @var KernelInterface
      */
     private $kernel = null;
+
+    /**
+     * @var ResqueJob
+     */
+    public $resqueJob = null;
 
     /**
      * @return ContainerInterface
@@ -48,6 +54,23 @@ abstract class ContainerAwareJob extends Job
             isset($this->args['kernel.environment']) ? $this->args['kernel.environment'] : 'dev',
             isset($this->args['kernel.debug']) ? $this->args['kernel.debug'] : true
         );
+    }
+
+    public function setUp()
+    {
+        /** @var $em \Doctrine\ORM\EntityManager */
+        $em = $this->getContainer()->get('doctrine');
+
+        /** @var \BCC\ResqueBundle\Entity\ResqueJob $resqueJobRepository */
+        $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
+
+        $jobId = $this->job->payload['id'];
+
+        $resqueJob = $resqueJobRepository->findOneByResqueUUID($jobId);
+
+        $resqueJob->setState(ResqueJob::STATE_RUNNING);
+        $em->persist($resqueJob);
+        $em->flush();
     }
 
     public function tearDown()

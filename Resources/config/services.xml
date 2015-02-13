@@ -12,15 +12,24 @@
         <parameter key="bcc_resque.redis.host" />
         <parameter key="bcc_resque.redis.port" />
         <parameter key="bcc_resque.redis.database" />
+        <parameter key="bcc_resque.entity.many_to_any_listener.class">BCC\ResqueBundle\Entity\Listener\ManyToAnyListener</parameter>
     </parameters>
 
     <services>
+        <service id="bcc_resque.entity.many_to_any_listener" class="%bcc_resque.entity.many_to_any_listener.class%">
+            <argument type="service" id="doctrine" />
+            <tag name="doctrine.event_listener" lazy="true" event="postGenerateSchema" />
+            <tag name="doctrine.event_listener" lazy="true" event="postLoad" />
+            <tag name="doctrine.event_listener" lazy="true" event="postPersist" />
+            <tag name="doctrine.event_listener" lazy="true" event="preRemove" />
+        </service>
         <service id="bcc_resque.resque" class="%bcc_resque.resque.class%" lazy="true">
             <argument type="collection">
                 <argument key="kernel.root_dir">%bcc_resque.worker.root_dir%</argument>
                 <argument key="kernel.debug">%kernel.debug%</argument>
                 <argument key="kernel.environment">%kernel.environment%</argument>
             </argument>
+            <argument type="service" id="doctrine" />
             <call method="setRedisConfiguration">
                 <argument>%bcc_resque.resque.redis.host%</argument>
                 <argument>%bcc_resque.resque.redis.port%</argument>

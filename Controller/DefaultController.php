@@ -58,6 +58,20 @@ class DefaultController extends Controller
         );
     }
 
+    public function showJobAction($jobId)
+    {
+
+        $job = $this->getResque()->getJob($jobId);
+
+        return $this->render(
+            'BCCResqueBundle:Default:job.html.twig',
+            array(
+                'job' => $job,
+            )
+        );
+    }
+
+
     public function listScheduledAction()
     {
         return $this->render(
