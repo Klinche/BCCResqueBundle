@@ -28,14 +28,14 @@ class Resque
     private $jobRetryStrategy = array();
 
     /**
-     * @var $em \Doctrine\ORM\EntityManager
+     * @var $registry \Symfony\Bridge\Doctrine\RegistryInterface
      */
-    public $em;
+    public $registry;
 
-    public function __construct(array $kernelOptions, $em)
+    public function __construct(array $kernelOptions, $registry)
     {
         $this->kernelOptions = $kernelOptions;
-        $this->em = $em;
+        $this->registry = $registry;
     }
 
     public function setPrefix($prefix)
@@ -79,17 +79,21 @@ class Resque
         $this->attachRetryStrategy($job);
 
         $resqueJob = new ResqueJob();
+
+        $class = \Doctrine\Common\Util\ClassUtils::getClass($resqueJob);
+        $em = $this->registry->getManagerForClass($class);
+
         $resqueJob->setQueue($job->queue);
         $resqueJob->setCreatedAt(new \DateTime('now'));
         $resqueJob->setState(ResqueJob::STATE_PENDING);
-        $this->em->persist($resqueJob);
-        $this->em->flush();
+        $em->persist($resqueJob);
+        $em->flush();
 
         $result = \Resque::enqueue($job->queue, \get_class($job), $job->args, true);
 
         $resqueJob->setResqueUUID($result);
-        $this->em->persist($resqueJob);
-        $this->em->flush();
+        $em->persist($resqueJob);
+        $em->flush();
 
         return $resqueJob;
     }

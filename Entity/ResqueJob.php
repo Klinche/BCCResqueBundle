@@ -37,7 +37,7 @@ class ResqueJob {
     /** @ORM\Id @ORM\GeneratedValue(strategy = "AUTO") @ORM\Column(type = "bigint", options = {"unsigned": true}) */
     private $id;
 
-    /** @ORM\Column(type = "text") */
+    /** @ORM\Column(type = "text", nullable=true) */
     private $resqueUUID;
 
     /** @ORM\Column(type = "string", length = 15) */
@@ -102,6 +102,13 @@ class ResqueJob {
      */
     private $relatedEntities;
 
+    public function __construct()
+    {
+        $this->createdAt = new \DateTime();
+        $this->dependencies = new ArrayCollection();
+        $this->retryJobs = new ArrayCollection();
+        $this->relatedEntities = new ArrayCollection();
+    }
 
     /**
      * @return mixed
@@ -202,22 +209,6 @@ class ResqueJob {
     /**
      * @return mixed
      */
-    public function getDependencies()
-    {
-        return $this->dependencies;
-    }
-
-    /**
-     * @param mixed $dependencies
-     */
-    public function setDependencies($dependencies)
-    {
-        $this->dependencies = $dependencies;
-    }
-
-    /**
-     * @return mixed
-     */
     public function getOutput()
     {
         return $this->output;
@@ -282,54 +273,6 @@ class ResqueJob {
     /**
      * @return mixed
      */
-    public function getMaxRetries()
-    {
-        return $this->maxRetries;
-    }
-
-    /**
-     * @param mixed $maxRetries
-     */
-    public function setMaxRetries($maxRetries)
-    {
-        $this->maxRetries = $maxRetries;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getOriginalJob()
-    {
-        return $this->originalJob;
-    }
-
-    /**
-     * @param mixed $originalJob
-     */
-    public function setOriginalJob($originalJob)
-    {
-        $this->originalJob = $originalJob;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getRetryJobs()
-    {
-        return $this->retryJobs;
-    }
-
-    /**
-     * @param mixed $retryJobs
-     */
-    public function setRetryJobs($retryJobs)
-    {
-        $this->retryJobs = $retryJobs;
-    }
-
-    /**
-     * @return mixed
-     */
     public function getRuntime()
     {
         return $this->runtime;
@@ -346,22 +289,6 @@ class ResqueJob {
     /**
      * @return mixed
      */
-    public function getRelatedEntities()
-    {
-        return $this->relatedEntities;
-    }
-
-    /**
-     * @param mixed $relatedEntities
-     */
-    public function setRelatedEntities($relatedEntities)
-    {
-        $this->relatedEntities = $relatedEntities;
-    }
-
-    /**
-     * @return mixed
-     */
     public function getResqueUUID()
     {
         return $this->resqueUUID;
@@ -373,6 +300,170 @@ class ResqueJob {
     public function setResqueUUID($resqueUUID)
     {
         $this->resqueUUID = $resqueUUID;
+    }
+
+    /**
+     * @return ArrayCollection
+     */
+    public function getRelatedEntities()
+    {
+        return $this->relatedEntities;
+    }
+
+    /**
+     * @param $class
+     * @return mixed|null
+     */
+    public function findRelatedEntity($class)
+    {
+        foreach ($this->relatedEntities as $entity) {
+            if ($entity instanceof $class) {
+                return $entity;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param $entity
+     */
+    public function addRelatedEntity($entity)
+    {
+        assert('is_object($entity)');
+        if ($this->relatedEntities->contains($entity)) {
+            return;
+        }
+        $this->relatedEntities->add($entity);
+    }
+
+    /**
+     * @return ArrayCollection
+     */
+    public function getDependencies()
+    {
+        return $this->dependencies;
+    }
+
+    /**
+     * @param ResqueJob $job
+     * @return bool
+     */
+    public function hasDependency(ResqueJob $job)
+    {
+        return $this->dependencies->contains($job);
+    }
+
+    /**
+     * @param ResqueJob $job
+     */
+    public function addDependency(ResqueJob $job)
+    {
+        if ($this->dependencies->contains($job)) {
+            return;
+        }
+        if ($this->mightHaveStarted()) {
+            throw new \LogicException('You cannot add dependencies to a job which might have been started already.');
+        }
+        $this->dependencies->add($job);
+    }
+
+    /**
+     * @return int
+     */
+    public function getMaxRetries()
+    {
+        return $this->maxRetries;
+    }
+
+    /**
+     * @param $tries
+     */
+    public function setMaxRetries($tries)
+    {
+        $this->maxRetries = (integer) $tries;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isRetryAllowed()
+    {
+        // If no retries are allowed, we can bail out directly, and we
+        // do not need to initialize the retryJobs relation.
+        if (0 === $this->maxRetries) {
+            return false;
+        }
+        return count($this->retryJobs) < $this->maxRetries;
+    }
+
+    /**
+     * @return $this
+     */
+    public function getOriginalJob()
+    {
+        if (null === $this->originalJob) {
+            return $this;
+        }
+        return $this->originalJob;
+    }
+
+    /**
+     * @param ResqueJob $job
+     */
+    public function setOriginalJob(ResqueJob $job)
+    {
+        if (self::STATE_PENDING !== $this->state) {
+            throw new \LogicException($this.' must be in state "PENDING".');
+        }
+        if (null !== $this->originalJob) {
+            throw new \LogicException($this.' already has an original job set.');
+        }
+        $this->originalJob = $job;
+    }
+
+    /**
+     * @param ResqueJob $job
+     */
+    public function addRetryJob(ResqueJob $job)
+    {
+        if (self::STATE_RUNNING !== $this->state) {
+            throw new \LogicException('Retry jobs can only be added to running jobs.');
+        }
+        $job->setOriginalJob($this);
+        $this->retryJobs->add($job);
+    }
+
+    /**
+     * @return ArrayCollection
+     */
+    public function getRetryJobs()
+    {
+        return $this->retryJobs;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isRetryJob()
+    {
+        return null !== $this->originalJob;
+    }
+
+    /**
+     * @return bool
+     */
+    private function mightHaveStarted()
+    {
+        if (null === $this->id) {
+            return false;
+        }
+        if (self::STATE_NEW === $this->state) {
+            return false;
+        }
+        if (self::STATE_PENDING === $this->state && ! $this->isStartable()) {
+            return false;
+        }
+        return true;
     }
 
 }

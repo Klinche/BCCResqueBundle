@@ -9,7 +9,7 @@
 namespace BCC\ResqueBundle\Entity\Listener;
 
 use Doctrine\ORM\Event\LifecycleEventArgs;
-use BCC\ResqueBundle\Entity\Job;
+use BCC\ResqueBundle\Entity\ResqueJob;
 
 class ManyToAnyListener {
     private $registry;

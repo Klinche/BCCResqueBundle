@@ -15,7 +15,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\Common\Collections\Criteria;
 use Doctrine\Common\Collections\Expr\ClosureExpressionVisitor;
 use Doctrine\Common\Collections\Selectable;
-use BCC\ResqueBundle\Entity\Job;
+use BCC\ResqueBundle\Entity\ResqueJob;
 use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\Validator\Constraints\Collection as Collection2;
 
@@ -31,7 +31,7 @@ class PersistentRelatedEntitiesCollection implements Collection, Selectable
     private $registry;
     private $job;
     private $entities;
-    public function __construct(RegistryInterface $registry, Job $job)
+    public function __construct(RegistryInterface $registry, ResqueJob $job)
     {
         $this->registry = $registry;
         $this->job = $job;
