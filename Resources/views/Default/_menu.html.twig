@@ -5,6 +5,7 @@
             <a class="brand" href="{{ path('BCCResqueBundle_homepage') }}">BCC Resque</a>
             <ul class="nav">
                 <li {{ nav.activeClass(activeNav,'homepage') }}><a href="{{ path('BCCResqueBundle_homepage') }}">Home</a></li>
+                <li {{ nav.activeClass(activeNav,'all_list') }}><a href="{{ path('BCCResqueBundle_all_database_list') }}">All Jobs</a></li>
                 <li {{ nav.activeClass(activeNav,'scheduled_list') }}><a href="{{ path('BCCResqueBundle_scheduled_list') }}">Scheduled</a></li>
                 <li {{ nav.activeClass(activeNav,'failed_list') }}><a href="{{ path('BCCResqueBundle_failed_list') }}">Failed</a></li>
             </ul>

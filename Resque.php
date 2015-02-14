@@ -77,12 +77,13 @@ class Resque
             $job->setBCCJobId($this->generateBCCResqueGUID());
         }
 
+
+
         $this->attachRetryStrategy($job);
 
-        $resqueJob = new ResqueJob($job->getBCCJobId(), $job->queue, $job->args);
+        $resqueJob = new ResqueJob($job->getBCCJobId(), \get_class($job), $job->queue, $job->args);
 
-        $class = \Doctrine\Common\Util\ClassUtils::getClass($resqueJob);
-        $em = $this->registry->getManagerForClass($class);
+        $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         $em->persist($resqueJob);
         $em->flush();
@@ -121,10 +122,9 @@ class Resque
 
         $this->attachRetryStrategy($job);
 
-        $resqueJob = new ResqueJob($job->getBCCJobId(), $job->queue, $job->args, $at);
+        $resqueJob = new ResqueJob($job->getBCCJobId(), \get_class($job), $job->queue, $job->args, $at);
 
-        $class = \Doctrine\Common\Util\ClassUtils::getClass($resqueJob);
-        $em = $this->registry->getManagerForClass($class);
+        $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         $em->persist($resqueJob);
         $em->flush();
@@ -144,16 +144,12 @@ class Resque
 
         $resqueJob = new ResqueJob($job, time() + $in);
 
-        $class = \Doctrine\Common\Util\ClassUtils::getClass($resqueJob);
-        $em = $this->registry->getManagerForClass($class);
+        $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         $em->persist($resqueJob);
         $em->flush();
 
         \ResqueScheduler::enqueueIn($in, $job->queue, \get_class($job), $job->args);
-
-        $em->persist($resqueJob);
-        $em->flush();
 
         return null;
     }
@@ -286,9 +282,19 @@ class Resque
         return $result;
     }
 
+    /**
+     * @param $jobId
+     * @return ResqueJob
+     */
     public function getJob($jobId)
     {
-        $job = \Resque::redis()->get('job:'.$jobId.':status');
+        $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
+
+        /** @var \BCC\ResqueBundle\Entity\Repository\ResqueJobRepository $resqueJobRepository */
+        $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
+
+        /** @var \BCC\ResqueBundle\Entity\ResqueJob $job */
+        $job = $resqueJobRepository->findOneByBCCUUID($jobId);
 
         return $job;
     }
@@ -329,8 +335,7 @@ class Resque
         $args = $job->getArguments();
         $jobId = $args['bcc_resque.job_id'];
 
-        $class = \Doctrine\Common\Util\ClassUtils::getClass(new ResqueJob());
-        $em = $this->registry->getManagerForClass($class);
+        $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         /** @var \BCC\ResqueBundle\Entity\Repository\ResqueJobRepository $resqueJobRepository */
         $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
@@ -351,8 +356,7 @@ class Resque
         $args = $job->getArguments();
         $jobId = $args['bcc_resque.job_id'];
 
-        $class = \Doctrine\Common\Util\ClassUtils::getClass(new ResqueJob());
-        $em = $this->registry->getManagerForClass($class);
+        $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         /** @var \BCC\ResqueBundle\Entity\Repository\ResqueJobRepository $resqueJobRepository */
         $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
@@ -393,9 +397,9 @@ class Resque
 
         $args['bcc_resque.job_id'] = $this->generateBCCResqueGUID();
 
-        $resqueJob = new ResqueJob($args['bcc_resque.job_id'], $job->queue, $args);
-        $class = \Doctrine\Common\Util\ClassUtils::getClass($resqueJob);
-        $em = $this->registry->getManagerForClass($class);
+        $resqueJob = new ResqueJob($args['bcc_resque.job_id'], $job->payload['class'], $job->queue, $args);
+
+        $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         /** @var \BCC\ResqueBundle\Entity\Repository\ResqueJobRepository $resqueJobRepository */
         $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
@@ -407,6 +411,8 @@ class Resque
         $oldResqueJob->setState(ResqueJob::STATE_FAILED);
         $oldResqueJob->setClosedAt(new \DateTime("now"));
 
+        $oldResqueJob->setErrorOutput($exception->getTraceAsString());
+
         $em->persist($oldResqueJob);
 
         if ($delay == 0) {
@@ -416,6 +422,8 @@ class Resque
             $result = \Resque::enqueue($job->queue, $job->payload['class'], $args, true);
 
             $resqueJob->setResqueStatusUUID($result);
+
+
             $em->persist($resqueJob);
             $em->flush();
 

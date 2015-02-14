@@ -1,9 +1,93 @@
 {% extends 'BCCResqueBundle::layout.html.twig' %}
+{% import "BCCResqueBundle::macros.html.twig" as macros %}
+
 {% block body %}
-{% include "BCCResqueBundle:Default:_menu.html.twig" with {activeNav: 'homepage'} %}
+{% include "BCCResqueBundle:Default:_menu.html.twig" with {activeNav: 'all_list'} %}
 <div class="container">
     <div class="row span12">
-        <h2>Job {{ job.queue }}</h2>
+        <h2>Job {{ job.bccUUID }}</h2>
+
+        <table class="table table-bordered table-striped">
+            <tr>
+                <th width="20%">Class</th>
+                <td>{{ job.jobClass }}</td>
+            </tr>
+            <tr>
+                <th>State</th>
+                <td>{{ macros.state(job) }}</td>
+            </tr>
+            <tr>
+                <th>Created</th>
+                <td>{{ macros.ago(job.createdAt) }}</td>
+            </tr>
+            {% if job.closedAt %}
+                <tr>
+                    <th>Runtime</th>
+                    <td>{{ macros.runtime(job) }}</td>
+                </tr>
+                <tr>
+                    <th>Closed</th>
+                    <td>{{ macros.ago(job.closedAt) }}</td>
+                </tr>
+            {% endif %}
+            {% if job.isRetryJob() %}
+                <tr>
+                    <th>Original Job</th>
+                    <td><a href="{{ path("BCCResqueBundle_job", {jobId: job.originalJob.bccUUID } ) }}">#{{ job.originalJob.id }}</a> {{ macros.state(job.originalJob) }}</td>
+                </tr>
+            {% endif %}
+            {% if relatedEntities|length > 0 %}
+                <tr>
+                    <th>Related Entities</th>
+                    <td>
+
+                    </td>
+                </tr>
+            {% endif %}
+            {% if job.dependencies|length > 0 %}
+                <tr>
+                    <th>Dependencies</th>
+                    <td>
+                        {%- for dep in job.dependencies -%}
+                            <a href="{{ path("BCCResqueBundle_job", { jobId: dep.bccUUID }) }}" title="{{ dep.jobClass }}{% for arg in dep.args %} {{ arg }}{% endfor %} (ID {{ dep.bccUUID }})">{{ dep.jobClass }}</a> {{ macros.state(dep) }}
+                            {%- if not loop.last %}, {% endif -%}
+                        {%- endfor -%}
+                </tr>
+            {% endif %}
+            {% if incomingDependencies|length > 0 %}
+                <tr>
+                    <th>Incoming Dependencies</th>
+                    <td>
+                        {%- for dep in incomingDependencies -%}
+                            <a href="{{ path("BCCResqueBundle_job", { jobId : dep.bccUUID}) }}" title="{{ dep.jobClass }}{% for arg in dep.args %} {{ arg }}{% endfor %} (ID {{ dep.bccUUID }})">{{ dep.jobClass }}</a> {{ macros.state(dep) }}
+                        {%- endfor -%}
+                    </td>
+                </tr>
+            {% endif %}
+        </table>
+        {% if job.retryJobs|length > 0 %}
+            <h3>Retry Jobs</h3>
+            <table class="table table-bordered table-striped table-condensed">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Created</th>
+                    <th>State</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for retryJob in job.retryJobs %}
+                    <tr>
+                        <td><a href="{{ path("BCCResqueBundle_job", { jobId : retryJob.bccUUID}) }}">{{ retryJob.bccUUID }}</a></td>
+                        <td>{{ macros.ago(retryJob.createdAt) }}</td>
+                        <td>{{ macros.state(retryJob) }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+
 
     </div>
 </div>

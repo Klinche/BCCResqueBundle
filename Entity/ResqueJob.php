@@ -32,9 +32,10 @@ class ResqueJob {
     /** State if job exits with a non-successful exit code. */
     const STATE_FAILED = 'failed';
 
-
-
-    /** @ORM\Id @ORM\GeneratedValue(strategy = "AUTO") @ORM\Column(type = "bigint", options = {"unsigned": true}) */
+    /**
+     * @ORM\Id @ORM\GeneratedValue(strategy = "AUTO")
+     * @ORM\Column(type = "bigint", options = {"unsigned": true})
+     */
     private $id;
 
     /** @ORM\Column(type = "text", nullable=true) */
@@ -42,6 +43,9 @@ class ResqueJob {
 
     /** @ORM\Column(type = "text") */
     private $bccUUID;
+
+    /** @ORM\Column(type = "text") */
+    private $jobClass;
 
     /** @ORM\Column(type = "string", length = 15) */
     private $state;
@@ -70,20 +74,8 @@ class ResqueJob {
      */
     private $dependencies;
 
-    /** @ORM\Column(type = "text", nullable = true) */
-    private $output;
-
     /** @ORM\Column(type = "text", name="errorOutput", nullable = true) */
     private $errorOutput;
-
-    /** @ORM\Column(type = "smallint", name="exitCode", nullable = true, options = {"unsigned": true}) */
-    private $exitCode;
-
-    /** @ORM\Column(type = "smallint", name="maxRuntime", options = {"unsigned": true}) */
-    private $maxRuntime = 0;
-
-    /** @ORM\Column(type = "smallint", name="maxRetries", options = {"unsigned": true}) */
-    private $maxRetries = 0;
 
     /**
      * @ORM\ManyToOne(targetEntity = "ResqueJob", inversedBy = "retryJobs")
@@ -114,7 +106,7 @@ class ResqueJob {
      * @param array $args
      * @param null $at
      */
-    public function __construct($jobId = "", $queue = "default", $args = array(), $at = null)
+    public function __construct($jobId = "", $jobClass= "", $queue = "default", $args = array(), $at = null)
     {
         $this->createdAt = new \DateTime();
         $this->dependencies = new ArrayCollection();
@@ -124,10 +116,9 @@ class ResqueJob {
         $this->queue = $queue;
         $this->state = self::STATE_PENDING;
         $this->bccUUID = $jobId;
+        $this->jobClass = $jobClass;
 
         $this->setExecuteAfter($at);
-
-
     }
 
     /**
@@ -179,7 +170,7 @@ class ResqueJob {
     }
 
     /**
-     * @return mixed
+     * @return \DateTime
      */
     public function getStartedAt()
     {
@@ -187,7 +178,7 @@ class ResqueJob {
     }
 
     /**
-     * @param mixed $startedAt
+     * @param \DateTime $startedAt
      */
     public function setStartedAt($startedAt)
     {
@@ -195,7 +186,7 @@ class ResqueJob {
     }
 
     /**
-     * @return mixed
+     * @return \DateTime
      */
     public function getExecuteAfter()
     {
@@ -203,7 +194,7 @@ class ResqueJob {
     }
 
     /**
-     * @param mixed $executeAfter
+     * @param \DateTime $executeAfter
      */
     public function setExecuteAfter($executeAfter)
     {
@@ -218,7 +209,7 @@ class ResqueJob {
     }
 
     /**
-     * @return mixed
+     * @return \DateTime
      */
     public function getClosedAt()
     {
@@ -226,27 +217,15 @@ class ResqueJob {
     }
 
     /**
-     * @param mixed $closedAt
+     * @param \DateTime $closedAt
      */
     public function setClosedAt($closedAt)
     {
         $this->closedAt = $closedAt;
-    }
 
-    /**
-     * @return mixed
-     */
-    public function getOutput()
-    {
-        return $this->output;
-    }
-
-    /**
-     * @param mixed $output
-     */
-    public function setOutput($output)
-    {
-        $this->output = $output;
+        if(!is_null($this->getStartedAt()) && !is_null($this->getClosedAt())) {
+            $this->setRuntime($this->getClosedAt()->getTimestamp()-$this->getStartedAt()->getTimestamp());
+        }
     }
 
     /**
@@ -263,38 +242,6 @@ class ResqueJob {
     public function setErrorOutput($errorOutput)
     {
         $this->errorOutput = $errorOutput;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getExitCode()
-    {
-        return $this->exitCode;
-    }
-
-    /**
-     * @param mixed $exitCode
-     */
-    public function setExitCode($exitCode)
-    {
-        $this->exitCode = $exitCode;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getMaxRuntime()
-    {
-        return $this->maxRuntime;
-    }
-
-    /**
-     * @param mixed $maxRuntime
-     */
-    public function setMaxRuntime($maxRuntime)
-    {
-        $this->maxRuntime = $maxRuntime;
     }
 
     /**
@@ -343,6 +290,22 @@ class ResqueJob {
     public function setBccUUID($bccUUID)
     {
         $this->bccUUID = $bccUUID;
+    }
+
+    /**
+     * @return string
+     */
+    public function getJobClass()
+    {
+        return $this->jobClass;
+    }
+
+    /**
+     * @param string $jobClass
+     */
+    public function setJobClass($jobClass)
+    {
+        $this->jobClass = $jobClass;
     }
 
     /**
@@ -419,35 +382,6 @@ class ResqueJob {
     }
 
     /**
-     * @return int
-     */
-    public function getMaxRetries()
-    {
-        return $this->maxRetries;
-    }
-
-    /**
-     * @param $tries
-     */
-    public function setMaxRetries($tries)
-    {
-        $this->maxRetries = (integer) $tries;
-    }
-
-    /**
-     * @return bool
-     */
-    public function isRetryAllowed()
-    {
-        // If no retries are allowed, we can bail out directly, and we
-        // do not need to initialize the retryJobs relation.
-        if (0 === $this->maxRetries) {
-            return false;
-        }
-        return count($this->retryJobs) < $this->maxRetries;
-    }
-
-    /**
      * @return $this
      */
     public function getOriginalJob()
@@ -516,5 +450,26 @@ class ResqueJob {
         }
         return true;
     }
+
+
+
+    public function isPending()
+    {
+        return self::STATE_PENDING === $this->state;
+    }
+
+    public function isRunning()
+    {
+        return self::STATE_RUNNING === $this->state;
+    }
+    public function isFailed()
+    {
+        return self::STATE_FAILED === $this->state;
+    }
+    public function isFinished()
+    {
+        return self::STATE_FINISHED === $this->state;
+    }
+
 
 }

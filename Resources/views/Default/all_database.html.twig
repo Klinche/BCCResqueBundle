@@ -1,0 +1,51 @@
+{% extends 'BCCResqueBundle::layout.html.twig' %}
+{% import "BCCResqueBundle::macros.html.twig" as macros %}
+
+{% block body %}
+{% include "BCCResqueBundle:Default:_menu.html.twig" with {activeNav: 'all_list'} %}
+<div class="container">
+
+    <div class="row span12">
+        <h2>All Jobs</h2>
+
+        {% if jobPager.haveToPaginate %}
+            {{ jobPagerView.render(jobPager, jobPagerGenerator)|raw }}
+        {% endif %}
+
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Command</th>
+                    <th>State</th>
+                    <th>Created At</th>
+                    <th>Runtime</th>
+                    <th>Queue</th>
+                </tr>
+            </thead>
+            <tbody>
+
+                {% for job in jobPager %}
+                    <tr>
+                        <td><a href="{{ path("BCCResqueBundle_job", { jobId: job.bccUUID }) }}">{{ job.bccUUID }}</a></td>
+                        <td>{{ job.jobClass }}</td>
+                        <td>{{ macros.state(job) }}</td>
+                        <td>{{ macros.ago(job.createdAt) }}</td>
+                        <td>{{ macros.runtime(job) }}</td>
+                        <td>{{ macros.queue(job) }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="4">There are no jobs.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if jobPager.haveToPaginate %}
+            {{ jobPagerView.render(jobPager, jobPagerGenerator)|raw }}
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

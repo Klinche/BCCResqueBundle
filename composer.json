@@ -19,6 +19,15 @@
         "doctrine/common": ">=2.3,<3.0",
         "jms/di-extra-bundle": ">=1.1,<2.0"
     },
+    "require-dev": {
+        "pagerfanta/pagerfanta": "dev-master",
+        "sensio/framework-extra-bundle": "*"
+    },
+    "suggest": {
+        "pagerfanta/pagerfanta": "Required when using the webinterface.",
+        "sensio/framework-extra-bundle": "Required when using the webinterface.",
+        "symfony/twig-bundle": "Required when using the webinterface."
+    },
     "autoload": {
         "psr-0": { "BCC\\ResqueBundle": "" }
     },

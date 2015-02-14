@@ -3,9 +3,27 @@
 namespace BCC\ResqueBundle\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
+use JMS\DiExtraBundle\Annotation as DI;
+use Pagerfanta\Adapter\DoctrineORMAdapter;
+use Pagerfanta\Pagerfanta;
+use Pagerfanta\View\TwitterBootstrapView;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class DefaultController extends Controller
 {
+
+    /** @DI\Inject("doctrine") */
+    private $registry;
+
+    /** @DI\Inject */
+    private $request;
+
+    /** @DI\Inject */
+    private $router;
+
     public function indexAction()
     {
         $this->getResque()->pruneDeadWorkers();
@@ -14,6 +32,35 @@ class DefaultController extends Controller
             'BCCResqueBundle:Default:index.html.twig',
             array(
                 'resque' => $this->getResque(),
+            )
+        );
+    }
+
+    public function listDatabaseAction()
+    {
+        $qb = $this->getEm()->createQueryBuilder();
+        $qb->select('j')->from('BCCResqueBundle:ResqueJob', 'j')
+            ->where($qb->expr()->isNull('j.originalJob'))
+            ->orderBy('j.id', 'desc');
+
+        $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
+        $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
+        $pager->setMaxPerPage(max(5, min(50, (integer) $this->request->query->get('per_page', 20))));
+
+        $pagerView = new TwitterBootstrapView();
+        $router = $this->router;
+        $routeGenerator = function($page) use ($router, $pager) {
+            return $router->generate('BCCResqueBundle_all_database_list', array('page' => $page, 'per_page' => $pager->getMaxPerPage()));
+        };
+
+
+        return $this->render(
+            'BCCResqueBundle:Default:all_database.html.twig',
+            array(
+                'resque' => $this->getResque(),
+                'jobPager' => $pager,
+                'jobPagerView' => $pagerView,
+                'jobPagerGenerator' => $routeGenerator,
             )
         );
     }
@@ -60,7 +107,6 @@ class DefaultController extends Controller
 
     public function showJobAction($jobId)
     {
-
         $job = $this->getResque()->getJob($jobId);
 
         return $this->render(
@@ -126,5 +172,18 @@ class DefaultController extends Controller
         }
 
         return array($start, $count, $showingAll);
+    }
+
+
+    /** @return \Doctrine\ORM\EntityManager */
+    private function getEm()
+    {
+        return $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
+    }
+
+    /** @return \BCC\ResqueBundle\Entity\Repository\ResqueJobRepository */
+    private function getRepo()
+    {
+        return $this->getEm()->getRepository('BCCResqueBundle:ResqueJob');
     }
 }

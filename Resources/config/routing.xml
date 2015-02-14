@@ -12,6 +12,10 @@
         <default key="_controller">BCCResqueBundle:Default:showQueue</default>
     </route>
 
+    <route id="BCCResqueBundle_all_database_list" pattern="/list">
+        <default key="_controller">BCCResqueBundle:Default:listDatabase</default>
+    </route>
+
     <route id="BCCResqueBundle_failed_list" pattern="/failed/list">
         <default key="_controller">BCCResqueBundle:Default:listFailed</default>
     </route>
