@@ -74,24 +74,22 @@ class Resque
     {
         if ($job instanceof ContainerAwareJob) {
             $job->setKernelOptions($this->kernelOptions);
+            $job->setBCCJobId($this->generateBCCResqueGUID());
         }
 
         $this->attachRetryStrategy($job);
 
-        $resqueJob = new ResqueJob();
+        $resqueJob = new ResqueJob($job->getBCCJobId(), $job->queue, $job->args);
 
         $class = \Doctrine\Common\Util\ClassUtils::getClass($resqueJob);
         $em = $this->registry->getManagerForClass($class);
 
-        $resqueJob->setQueue($job->queue);
-        $resqueJob->setCreatedAt(new \DateTime('now'));
-        $resqueJob->setState(ResqueJob::STATE_PENDING);
         $em->persist($resqueJob);
         $em->flush();
 
         $result = \Resque::enqueue($job->queue, \get_class($job), $job->args, true);
 
-        $resqueJob->setResqueUUID($result);
+        $resqueJob->setResqueStatusUUID($result);
         $em->persist($resqueJob);
         $em->flush();
 
@@ -118,13 +116,22 @@ class Resque
     {
         if ($job instanceof ContainerAwareJob) {
             $job->setKernelOptions($this->kernelOptions);
+            $job->setBCCJobId($this->generateBCCResqueGUID());
         }
 
         $this->attachRetryStrategy($job);
 
+        $resqueJob = new ResqueJob($job->getBCCJobId(), $job->queue, $job->args, $at);
+
+        $class = \Doctrine\Common\Util\ClassUtils::getClass($resqueJob);
+        $em = $this->registry->getManagerForClass($class);
+
+        $em->persist($resqueJob);
+        $em->flush();
+
         \ResqueScheduler::enqueueAt($at, $job->queue, \get_class($job), $job->args);
 
-        return null;
+        return $resqueJob;
     }
 
     public function enqueueIn($in,Job $job)
@@ -135,7 +142,18 @@ class Resque
 
         $this->attachRetryStrategy($job);
 
+        $resqueJob = new ResqueJob($job, time() + $in);
+
+        $class = \Doctrine\Common\Util\ClassUtils::getClass($resqueJob);
+        $em = $this->registry->getManagerForClass($class);
+
+        $em->persist($resqueJob);
+        $em->flush();
+
         \ResqueScheduler::enqueueIn($in, $job->queue, \get_class($job), $job->args);
+
+        $em->persist($resqueJob);
+        $em->flush();
 
         return null;
     }
@@ -145,7 +163,7 @@ class Resque
         if ($job instanceof ContainerAwareJob) {
             $job->setKernelOptions($this->kernelOptions);
         }
-        
+
         $this->attachRetryStrategy($job);
 
         return \ResqueScheduler::removeDelayed($job->queue, \get_class($job),$job->args);
@@ -156,7 +174,7 @@ class Resque
         if ($job instanceof ContainerAwareJob) {
             $job->setKernelOptions($this->kernelOptions);
         }
-        
+
         $this->attachRetryStrategy($job);
 
         return \ResqueScheduler::removeDelayedJobFromTimestamp($at, $job->queue, \get_class($job), $job->args);
@@ -294,4 +312,134 @@ class Resque
             $job->args['bcc_resque.retry_strategy'] = $this->globalRetryStrategy;
         }
     }
+
+    /**
+     * @return string
+     */
+    static function generateBCCResqueGUID() {
+        return uniqid("bcc_resque.job_id", true);
+    }
+
+
+    #region "Events"
+
+
+    public function beforePerform(\Resque_Job $job)
+    {
+        $args = $job->getArguments();
+        $jobId = $args['bcc_resque.job_id'];
+
+        $class = \Doctrine\Common\Util\ClassUtils::getClass(new ResqueJob());
+        $em = $this->registry->getManagerForClass($class);
+
+        /** @var \BCC\ResqueBundle\Entity\Repository\ResqueJobRepository $resqueJobRepository */
+        $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
+
+        /** @var \BCC\ResqueBundle\Entity\ResqueJob $resqueJob */
+        $resqueJob = $resqueJobRepository->findOneByBCCUUID($jobId);
+
+        if(!is_null($resqueJob)) {
+            $resqueJob->setState(ResqueJob::STATE_RUNNING);
+            $resqueJob->setStartedAt(new \DateTime('now'));
+            $em->persist($resqueJob);
+            $em->flush();
+        }
+    }
+
+    public function afterPerform(\Resque_Job $job)
+    {
+        $args = $job->getArguments();
+        $jobId = $args['bcc_resque.job_id'];
+
+        $class = \Doctrine\Common\Util\ClassUtils::getClass(new ResqueJob());
+        $em = $this->registry->getManagerForClass($class);
+
+        /** @var \BCC\ResqueBundle\Entity\Repository\ResqueJobRepository $resqueJobRepository */
+        $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
+
+        /** @var \BCC\ResqueBundle\Entity\ResqueJob $resqueJob */
+        $resqueJob = $resqueJobRepository->findOneByBCCUUID($jobId);
+
+        if(!is_null($resqueJob)) {
+            $resqueJob->setState(ResqueJob::STATE_FINISHED);
+            $resqueJob->setClosedAt(new \DateTime("now"));
+            $em->persist($resqueJob);
+            $em->flush();
+        }
+    }
+
+    public function onFailure(\Exception $exception, \Resque_Job $job)
+    {
+
+        $args = $job->getArguments();
+
+        if (empty($args['bcc_resque.retry_strategy'])) {
+            return;
+        }
+
+        if (!isset($args['bcc_resque.retry_attempt'])) {
+            $args['bcc_resque.retry_attempt'] = 0;
+        }
+
+        $backoff = $args['bcc_resque.retry_strategy'];
+        if (!isset($backoff[$args['bcc_resque.retry_attempt']])) {
+            return;
+        }
+
+        $delay = $backoff[$args['bcc_resque.retry_attempt']];
+        $args['bcc_resque.retry_attempt']++;
+
+        $oldJobId = $args['bcc_resque.job_id'];
+
+        $args['bcc_resque.job_id'] = $this->generateBCCResqueGUID();
+
+        $resqueJob = new ResqueJob($args['bcc_resque.job_id'], $job->queue, $args);
+        $class = \Doctrine\Common\Util\ClassUtils::getClass($resqueJob);
+        $em = $this->registry->getManagerForClass($class);
+
+        /** @var \BCC\ResqueBundle\Entity\Repository\ResqueJobRepository $resqueJobRepository */
+        $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
+
+        /** @var \BCC\ResqueBundle\Entity\ResqueJob $resqueJob */
+        $oldResqueJob = $resqueJobRepository->findOneByBCCUUID($oldJobId);
+
+        $resqueJob->setOriginalJob($oldResqueJob);
+        $oldResqueJob->setState(ResqueJob::STATE_FAILED);
+        $oldResqueJob->setClosedAt(new \DateTime("now"));
+
+        $em->persist($oldResqueJob);
+
+        if ($delay == 0) {
+            $em->persist($resqueJob);
+            $em->flush();
+
+            $result = \Resque::enqueue($job->queue, $job->payload['class'], $args, true);
+
+            $resqueJob->setResqueStatusUUID($result);
+            $em->persist($resqueJob);
+            $em->flush();
+
+//            $logger->log(Psr\Log\LogLevel::ERROR, 'Job failed. Auto re-queued, attempt number: {attempt}', array(
+//                    'attempt' => $args['bcc_resque.retry_attempt'] - 1)
+//            );
+        } else {
+            $at = time() + $delay;
+
+            $resqueJob->setExecuteAfter($at);
+            $em->persist($resqueJob);
+            $em->flush();
+
+            \ResqueScheduler::enqueueAt($at, $job->queue, $job->payload['class'], $args);
+
+
+//            $logger->log(Psr\Log\LogLevel::ERROR, 'Job failed. Auto re-queued. Scheduled for: {timestamp}, attempt number: {attempt}', array(
+//                'timestamp' => date('Y-m-d H:i:s', $at),
+//                'attempt'   => $args['bcc_resque.retry_attempt'] - 1,
+//            ));
+        }
+    }
+
+    #endregion
+
+
 }

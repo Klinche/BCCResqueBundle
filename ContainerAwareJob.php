@@ -2,7 +2,6 @@
 
 namespace BCC\ResqueBundle;
 
-use BCC\ResqueBundle\Entity\ResqueJob;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -15,10 +14,6 @@ abstract class ContainerAwareJob extends Job
      */
     private $kernel = null;
 
-    /**
-     * @var ResqueJob
-     */
-    public $resqueJob = null;
 
     /**
      * @return ContainerInterface
@@ -36,6 +31,17 @@ abstract class ContainerAwareJob extends Job
     public function setKernelOptions(array $kernelOptions)
     {
         $this->args = \array_merge($this->args, $kernelOptions);
+    }
+
+    public function setBCCJobId($bccJobId)
+    {
+        $this->args['bcc_resque.job_id'] = $bccJobId;
+    }
+
+
+    public function getBCCJobId()
+    {
+        return $this->args['bcc_resque.job_id'];
     }
 
     /**
@@ -57,53 +63,8 @@ abstract class ContainerAwareJob extends Job
         );
     }
 
-    public function setUp()
-    {
-        /** @var $registry \Symfony\Bridge\Doctrine\RegistryInterface */
-        $registry = $this->getContainer()->get('doctrine');
-
-        $class = \Doctrine\Common\Util\ClassUtils::getClass(new ResqueJob());
-        $em = $registry->getManagerForClass($class);
-
-
-        /** @var \BCC\ResqueBundle\Entity\ResqueJob $resqueJobRepository */
-        $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
-
-        $jobId = $this->job->payload['id'];
-
-        /** @var \BCC\ResqueBundle\Entity\ResqueJob $resqueJob */
-        $resqueJob = $resqueJobRepository->findOneByResqueUUID($jobId);
-
-        if(!is_null($resqueJob)) {
-            $resqueJob->setState(ResqueJob::STATE_RUNNING);
-            $resqueJob->setStartedAt(new DateTime('now'));
-            $em->persist($resqueJob);
-            $em->flush();
-        }
-    }
-
     public function tearDown()
     {
-        /** @var $registry \Symfony\Bridge\Doctrine\RegistryInterface */
-        $registry = $this->getContainer()->get('doctrine');
-
-        $class = \Doctrine\Common\Util\ClassUtils::getClass(new ResqueJob());
-        $em = $registry->getManagerForClass($class);
-
-
-        /** @var \BCC\ResqueBundle\Entity\ResqueJob $resqueJobRepository */
-        $resqueJobRepository = $em->getRepository('BCCResqueBundle:ResqueJob');
-
-        $jobId = $this->job->payload['id'];
-
-        $resqueJob = $resqueJobRepository->findOneByResqueUUID($jobId);
-
-        if(!is_null($resqueJob)) {
-            $resqueJob->setState(ResqueJob::STATE_FINISHED);
-            $em->persist($resqueJob);
-            $em->flush();
-        }
-
         if ($this->kernel) {
             $this->kernel->shutdown();
         }

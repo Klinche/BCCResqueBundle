@@ -38,7 +38,10 @@ class ResqueJob {
     private $id;
 
     /** @ORM\Column(type = "text", nullable=true) */
-    private $resqueUUID;
+    private $resqueStatusUUID;
+
+    /** @ORM\Column(type = "text") */
+    private $bccUUID;
 
     /** @ORM\Column(type = "string", length = 15) */
     private $state;
@@ -94,6 +97,9 @@ class ResqueJob {
     /** @ORM\Column(type = "smallint", nullable = true, options = {"unsigned": true}) */
     private $runtime;
 
+    /** @ORM\Column(type = "json_array") */
+    private $args;
+
     /**
      * This may store any entities which are related to this job, and are
      * managed by Doctrine.
@@ -102,12 +108,26 @@ class ResqueJob {
      */
     private $relatedEntities;
 
-    public function __construct()
+    /**
+     * @param $jobId
+     * @param string $queue
+     * @param array $args
+     * @param null $at
+     */
+    public function __construct($jobId = "", $queue = "default", $args = array(), $at = null)
     {
         $this->createdAt = new \DateTime();
         $this->dependencies = new ArrayCollection();
         $this->retryJobs = new ArrayCollection();
         $this->relatedEntities = new ArrayCollection();
+        $this->args = $args;
+        $this->queue = $queue;
+        $this->state = self::STATE_PENDING;
+        $this->bccUUID = $jobId;
+
+        $this->setExecuteAfter($at);
+
+
     }
 
     /**
@@ -187,7 +207,14 @@ class ResqueJob {
      */
     public function setExecuteAfter($executeAfter)
     {
-        $this->executeAfter = $executeAfter;
+        if($executeAfter != null && $executeAfter instanceof \DateTime) {
+            $this->executeAfter = $executeAfter;
+        } elseif($executeAfter != null) {
+            $this->executeAfter = new \DateTime("now");
+            $this->executeAfter->setTimestamp($executeAfter);
+        } else {
+            $this->executeAfter = null;
+        }
     }
 
     /**
@@ -287,19 +314,35 @@ class ResqueJob {
     }
 
     /**
-     * @return mixed
+     * @return string
      */
-    public function getResqueUUID()
+    public function getResqueStatusUUID()
     {
-        return $this->resqueUUID;
+        return $this->resqueStatusUUID;
     }
 
     /**
-     * @param mixed $resqueUUID
+     * @param string $resqueStatusUUID
      */
-    public function setResqueUUID($resqueUUID)
+    public function setResqueStatusUUID($resqueStatusUUID)
     {
-        $this->resqueUUID = $resqueUUID;
+        $this->resqueStatusUUID = $resqueStatusUUID;
+    }
+
+    /**
+     * @return string
+     */
+    public function getBccUUID()
+    {
+        return $this->bccUUID;
+    }
+
+    /**
+     * @param string $bccUUID
+     */
+    public function setBccUUID($bccUUID)
+    {
+        $this->bccUUID = $bccUUID;
     }
 
     /**
@@ -365,6 +408,14 @@ class ResqueJob {
             throw new \LogicException('You cannot add dependencies to a job which might have been started already.');
         }
         $this->dependencies->add($job);
+    }
+
+    /**
+     * @return array
+     */
+    public function getArgs()
+    {
+        return $this->args;
     }
 
     /**
