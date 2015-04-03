@@ -407,13 +407,13 @@ class Resque
         /** @var \BCC\ResqueBundle\Entity\ResqueJob $resqueJob */
         $oldResqueJob = $resqueJobRepository->findOneByBCCUUID($oldJobId);
 
-        $resqueJob->setOriginalJob($oldResqueJob);
-        $oldResqueJob->setState(ResqueJob::STATE_FAILED);
-        $oldResqueJob->setClosedAt(new \DateTime("now"));
-
-        $oldResqueJob->setErrorOutput($exception->getTraceAsString());
-
-        $em->persist($oldResqueJob);
+        if(!is_null($oldResqueJob)) {
+            $resqueJob->setOriginalJob($oldResqueJob);
+            $oldResqueJob->setState(ResqueJob::STATE_FAILED);
+            $oldResqueJob->setClosedAt(new \DateTime("now"));
+            $oldResqueJob->setErrorOutput($exception->getTraceAsString());
+            $em->persist($oldResqueJob);
+        }
 
         if ($delay == 0) {
             $em->persist($resqueJob);
