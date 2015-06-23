@@ -86,13 +86,13 @@ class Resque
         $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         $em->persist($resqueJob);
-        $em->flush();
+        $em->flush($resqueJob);
 
         $result = \Resque::enqueue($job->queue, \get_class($job), $job->args, true);
 
         $resqueJob->setResqueStatusUUID($result);
         $em->persist($resqueJob);
-        $em->flush();
+        $em->flush($resqueJob);
 
         return $resqueJob;
     }
@@ -127,7 +127,7 @@ class Resque
         $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         $em->persist($resqueJob);
-        $em->flush();
+        $em->flush($resqueJob);
 
         \ResqueScheduler::enqueueAt($at, $job->queue, \get_class($job), $job->args);
 
@@ -147,7 +147,7 @@ class Resque
         $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         $em->persist($resqueJob);
-        $em->flush();
+        $em->flush($resqueJob);
 
         \ResqueScheduler::enqueueIn($in, $job->queue, \get_class($job), $job->args);
 
