@@ -86,13 +86,13 @@ class Resque
         $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         $em->persist($resqueJob);
-        $em->flush();
+        $em->flush($resqueJob);
 
         $result = \Resque::enqueue($job->queue, \get_class($job), $job->args, true);
 
         $resqueJob->setResqueStatusUUID($result);
         $em->persist($resqueJob);
-        $em->flush();
+        $em->flush($resqueJob);
 
         return $resqueJob;
     }
@@ -127,7 +127,7 @@ class Resque
         $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         $em->persist($resqueJob);
-        $em->flush();
+        $em->flush($resqueJob);
 
         \ResqueScheduler::enqueueAt($at, $job->queue, \get_class($job), $job->args);
 
@@ -147,7 +147,7 @@ class Resque
         $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         $em->persist($resqueJob);
-        $em->flush();
+        $em->flush($resqueJob);
 
         \ResqueScheduler::enqueueIn($in, $job->queue, \get_class($job), $job->args);
 
@@ -407,13 +407,13 @@ class Resque
         /** @var \BCC\ResqueBundle\Entity\ResqueJob $resqueJob */
         $oldResqueJob = $resqueJobRepository->findOneByBCCUUID($oldJobId);
 
-        $resqueJob->setOriginalJob($oldResqueJob);
-        $oldResqueJob->setState(ResqueJob::STATE_FAILED);
-        $oldResqueJob->setClosedAt(new \DateTime("now"));
-
-        $oldResqueJob->setErrorOutput($exception->getTraceAsString());
-
-        $em->persist($oldResqueJob);
+        if(!is_null($oldResqueJob)) {
+            $resqueJob->setOriginalJob($oldResqueJob);
+            $oldResqueJob->setState(ResqueJob::STATE_FAILED);
+            $oldResqueJob->setClosedAt(new \DateTime("now"));
+            $oldResqueJob->setErrorOutput($exception->getTraceAsString());
+            $em->persist($oldResqueJob);
+        }
 
         if ($delay == 0) {
             $em->persist($resqueJob);

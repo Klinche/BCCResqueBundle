@@ -471,5 +471,12 @@ class ResqueJob {
         return self::STATE_FINISHED === $this->state;
     }
 
+    /**
+     * @return mixed
+     */
+    public function getId()
+    {
+        return $this->id;
+    }
 
 }

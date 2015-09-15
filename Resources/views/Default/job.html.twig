@@ -36,7 +36,7 @@
                     <td><a href="{{ path("BCCResqueBundle_job", {jobId: job.originalJob.bccUUID } ) }}">#{{ job.originalJob.id }}</a> {{ macros.state(job.originalJob) }}</td>
                 </tr>
             {% endif %}
-            {% if relatedEntities|length > 0 %}
+            {% if job.relatedEntities|length > 0 %}
                 <tr>
                     <th>Related Entities</th>
                     <td>
@@ -52,16 +52,6 @@
                             <a href="{{ path("BCCResqueBundle_job", { jobId: dep.bccUUID }) }}" title="{{ dep.jobClass }}{% for arg in dep.args %} {{ arg }}{% endfor %} (ID {{ dep.bccUUID }})">{{ dep.jobClass }}</a> {{ macros.state(dep) }}
                             {%- if not loop.last %}, {% endif -%}
                         {%- endfor -%}
-                </tr>
-            {% endif %}
-            {% if incomingDependencies|length > 0 %}
-                <tr>
-                    <th>Incoming Dependencies</th>
-                    <td>
-                        {%- for dep in incomingDependencies -%}
-                            <a href="{{ path("BCCResqueBundle_job", { jobId : dep.bccUUID}) }}" title="{{ dep.jobClass }}{% for arg in dep.args %} {{ arg }}{% endfor %} (ID {{ dep.bccUUID }})">{{ dep.jobClass }}</a> {{ macros.state(dep) }}
-                        {%- endfor -%}
-                    </td>
                 </tr>
             {% endif %}
         </table>

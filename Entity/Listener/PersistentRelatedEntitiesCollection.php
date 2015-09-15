@@ -456,7 +456,7 @@ class PersistentRelatedEntitiesCollection implements Collection, Selectable
         $con = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob')->getConnection();
         $entitiesPerClass = array();
         $count = 0;
-        foreach ($con->query("SELECT related_class, related_id FROM resque_job_related_entities WHERE job_id = ".$this->job->getId()) as $data) {
+        foreach ($con->query("SELECT related_class, related_id FROM resque_related_entities WHERE job_id = ".$this->job->getId()) as $data) {
             $count += 1;
             $entitiesPerClass[$data['related_class']][] = json_decode($data['related_id'], true);
         }
