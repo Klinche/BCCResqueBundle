@@ -17,7 +17,7 @@
 {%- endmacro %}
 
 {% macro runtime(job) -%}
-    {%- if job.canceled or job.terminated or job.failed or job.incomplete or job.finished -%}
+    {%- if job.failed or job.finished -%}
         <span>{{ job.runTime }} s</span>
     {%- endif %}
 {%- endmacro %}
