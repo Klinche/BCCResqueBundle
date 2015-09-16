@@ -74,8 +74,34 @@ class ResqueJob {
      */
     private $dependencies;
 
+    /** @ORM\Column(type = "text", name="output", nullable = true) */
+    private $output;
+
+    /**
+     * @return mixed
+     */
+    public function getOutput()
+    {
+        return $this->output;
+    }
+
+    /**
+     * @param mixed $output
+     */
+    public function setOutput($output)
+    {
+        $this->output = $output;
+    }
+
+
     /** @ORM\Column(type = "text", name="errorOutput", nullable = true) */
     private $errorOutput;
+
+    /** @ORM\Column(type = "text", name="error_message", nullable = true) */
+    private $errorMessage;
+
+    /** @ORM\Column(type = "text", name="error_class", nullable = true) */
+    private $errorClass;
 
     /**
      * @ORM\ManyToOne(targetEntity = "ResqueJob", inversedBy = "retryJobs")
@@ -477,6 +503,38 @@ class ResqueJob {
     public function getId()
     {
         return $this->id;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getErrorMessage()
+    {
+        return $this->errorMessage;
+    }
+
+    /**
+     * @param mixed $errorMessage
+     */
+    public function setErrorMessage($errorMessage)
+    {
+        $this->errorMessage = $errorMessage;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getErrorClass()
+    {
+        return $this->errorClass;
+    }
+
+    /**
+     * @param mixed $errorClass
+     */
+    public function setErrorClass($errorClass)
+    {
+        $this->errorClass = $errorClass;
     }
 
 }

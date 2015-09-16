@@ -97,8 +97,11 @@ if ($count > 1) {
             // Child, start the worker
             $queues = explode(',', $QUEUE);
             $worker = new Resque_Worker($queues);
-            $worker->setLogger($logger);
-            $logger->log(Psr\Log\LogLevel::NOTICE, 'Starting worker {worker}', array('worker' => $worker));
+
+            $aLogger = new \BCC\ResqueBundle\ResqueDBLogger($logLevel, new \BCC\ResqueBundle\Worker($worker));
+            $aLogger->log(Psr\Log\LogLevel::NOTICE, 'Starting worker {worker}', array('worker' => $worker));
+            $worker->setLogger($aLogger);
+
             $worker->work($interval, $BLOCKING);
             break;
         }
@@ -115,7 +118,10 @@ if ($count > 1) {
             die('Could not write PID information to ' . $PIDFILE);
     }
 
-    $logger->log(Psr\Log\LogLevel::NOTICE, 'Starting worker {worker}', array('worker' => $worker));
+    $aLogger = new \BCC\ResqueBundle\ResqueDBLogger($logLevel, new \BCC\ResqueBundle\Worker($worker));
+    $aLogger->log(Psr\Log\LogLevel::NOTICE, 'Starting worker {worker}', array('worker' => $worker));
+    $worker->setLogger($aLogger);
+
     $worker->work($interval, $BLOCKING);
 }
 

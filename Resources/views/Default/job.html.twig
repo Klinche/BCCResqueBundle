@@ -30,6 +30,10 @@
                     <td>{{ macros.ago(job.closedAt) }}</td>
                 </tr>
             {% endif %}
+            <tr>
+                <th>Arguments</th>
+                <td><pre>{{ job.args |json_encode(constant('JSON_PRETTY_PRINT')) }}</pre><br></td>
+            </tr>
             {% if job.isRetryJob() %}
                 <tr>
                     <th>Original Job</th>
@@ -77,8 +81,34 @@
             </table>
         {% endif %}
 
+        {% if job.failed %}
 
+            <h2>Failure</h2>
 
+            <table class="table table-bordered table-striped">
+                <tr>
+                    <th>Error Message</th>
+                    <td>{{ job.errorMessage|nl2br }}</td>
+                </tr>
+                <tr>
+                    <th>Error Class</th>
+                    <td>{{ job.errorClass|nl2br }}</td>
+                </tr>
+                <tr>
+                    <th>Error</th>
+                    <td>{{ job.errorOutput|nl2br }}</td>
+                </tr>
+            </table>
+        {% endif %}
+
+        <h2>Output</h2>
+
+        <table class="table table-bordered table-striped">
+            <tr>
+                <th>Output Log</th>
+                <td>{{ job.output|nl2br }}</td>
+            </tr>
+        </table>
     </div>
 </div>
 {% endblock %}

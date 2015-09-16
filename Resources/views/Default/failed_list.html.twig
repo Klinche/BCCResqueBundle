@@ -1,43 +1,51 @@
 {% extends 'BCCResqueBundle::layout.html.twig' %}
+{% import "BCCResqueBundle::macros.html.twig" as macros %}
+
 {% block body %}
 {% include "BCCResqueBundle:Default:_menu.html.twig" with {activeNav: 'failed_list'} %}
 <div class="container">
     <div class="row span12">
         <h2>Failed Jobs</h2>
-        {% include "BCCResqueBundle:Default:_miniPager.html.twig" %}
+        {% if jobPager.haveToPaginate %}
+            {{ jobPagerView.render(jobPager, jobPagerGenerator)|raw }}
+        {% endif %}
+
         <table class="table table-striped table-bordered">
             <thead>
-                <tr>
-                    <th>Queue</th>
-                    <th>Failed at</th>
-                    <th>Job</th>
-                    <th>Error</th>
-                    <th>Backtrace</th>
-                </tr>
+            <tr>
+                <th>ID</th>
+                <th>Command</th>
+                <th>Error</th>
+                <th>State</th>
+                <th>Created At</th>
+                <th>Runtime</th>
+                <th>Queue</th>
+            </tr>
             </thead>
             <tbody>
-                {% for job in jobs %}
+
+            {% for job in jobPager %}
                 <tr>
-                    <td class="span1">{{ job.queueName }}</td>
-                    <td class="span2"><a href="{{ path('BCCResqueBundle_job', {jobId: job.id}) }}">{{ job.failedAt }}</a></td>
-                    <td class="span4">{{ job.name }}</td>
-                    <td class="span5">
-                        {{ job.exceptionClass }}<br>
-                        {{ job.error }}
-                    </td>
-                    <td class="span5">
-                        <pre>{{ job.backtrace |json_encode(constant('JSON_PRETTY_PRINT')) }}</pre><br>
-                    </td>
+                    <td><a href="{{ path("BCCResqueBundle_job", { jobId: job.bccUUID }) }}">{{ job.bccUUID }}</a></td>
+                    <td>{{ job.jobClass }}</td>
+                    <td>{{ job.errorMessage }}</td>
+                    <td>{{ macros.state(job) }}</td>
+                    <td>{{ macros.ago(job.createdAt) }}</td>
+                    <td>{{ macros.runtime(job) }}</td>
+                    <td>{{ macros.queue(job) }}</td>
                 </tr>
-                {% else %}
+            {% else %}
                 <tr>
-                    <td colspan="5">
-                        <em>empty...</em>
-                    </td>
+                    <td colspan="4">There are no jobs.</td>
                 </tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
+
+        {% if jobPager.haveToPaginate %}
+            {{ jobPagerView.render(jobPager, jobPagerGenerator)|raw }}
+        {% endif %}
+
     </div>
 </div>
 {% endblock %}

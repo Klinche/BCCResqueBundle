@@ -84,8 +84,15 @@
                                     <ul class="unstyled">
                                         {% for argname, argvalue in job.args %}
                                             <li>
-                                                <span>{{ argname }}</span>
-                                                <em class="pull-right">{{ argvalue | json_encode() }}</em>
+                                                {% if argname == "bcc_resque.job_id" %}
+                                                    <span>{{ argname }}</span>
+                                                    <em class="pull-right"><a href="{{ path("BCCResqueBundle_job", { jobId: argvalue }) }}">{{ argvalue }}</a></em>
+                                                {% else %}
+                                                    <span>{{ argname }}</span>
+                                                    <em class="pull-right">{{ argvalue | json_encode() }}</em>
+                                                {% endif %}
+
+
                                             </li>
                                         {% endfor %}
                                     </ul>

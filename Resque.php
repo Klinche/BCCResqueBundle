@@ -77,8 +77,6 @@ class Resque
             $job->setBCCJobId($this->generateBCCResqueGUID());
         }
 
-
-
         $this->attachRetryStrategy($job);
 
         $resqueJob = new ResqueJob($job->getBCCJobId(), \get_class($job), $job->queue, $job->args);
@@ -356,6 +354,9 @@ class Resque
         $args = $job->getArguments();
         $jobId = $args['bcc_resque.job_id'];
 
+        $statusPacket = json_decode(\Resque::redis()->get('job:' . $job->payload['id'] . ':log'), true);
+
+
         $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
         /** @var \BCC\ResqueBundle\Entity\Repository\ResqueJobRepository $resqueJobRepository */
@@ -367,6 +368,8 @@ class Resque
         if(!is_null($resqueJob)) {
             $resqueJob->setState(ResqueJob::STATE_FINISHED);
             $resqueJob->setClosedAt(new \DateTime("now"));
+            $resqueJob->setOutput($statusPacket['log']);
+            \Resque::redis()->del('job:' . $job->payload['id'] . ':log');
             $em->persist($resqueJob);
             $em->flush();
         }
@@ -411,6 +414,11 @@ class Resque
             $resqueJob->setOriginalJob($oldResqueJob);
             $oldResqueJob->setState(ResqueJob::STATE_FAILED);
             $oldResqueJob->setClosedAt(new \DateTime("now"));
+            $oldResqueJob->setErrorMessage($exception->getMessage());
+            $oldResqueJob->setErrorClass(get_class($exception));
+            $statusPacket = json_decode(\Resque::redis()->get('job:' . $job->payload['id'] . ':log'), true);
+            \Resque::redis()->del('job:' . $job->payload['id'] . ':log');
+            $oldResqueJob->setOutput($statusPacket['log']);
             $oldResqueJob->setErrorOutput($exception->getTraceAsString());
             $em->persist($oldResqueJob);
         }

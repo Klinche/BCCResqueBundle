@@ -7,7 +7,7 @@ class Worker
     /**
      * @var \Resque_Worker
      */
-    protected $worker;
+    public $worker;
 
     public function __construct(\Resque_Worker $worker)
     {

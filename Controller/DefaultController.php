@@ -2,6 +2,7 @@
 
 namespace BCC\ResqueBundle\Controller;
 
+use JMS\JobQueueBundle\Entity\Job;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use JMS\DiExtraBundle\Annotation as DI;
 use Pagerfanta\Adapter\DoctrineORMAdapter;
@@ -88,19 +89,30 @@ class DefaultController extends Controller
 
     public function listFailedAction()
     {
-        list($start, $count, $showingAll) = $this->getShowParameters();
+        $qb = $this->getEm()->createQueryBuilder();
+        $qb->select('j')->from('BCCResqueBundle:ResqueJob', 'j')
+            ->where($qb->expr()->in('j.state', ':state'))
+            ->orderBy('j.id', 'desc');
+        $qb->setParameter('state', array(Job::STATE_FAILED, Job::STATE_INCOMPLETE, Job::STATE_CANCELED, Job::STATE_TERMINATED));
 
-        $jobs = $this->getResque()->getFailedJobs($start, $count);
+        $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
+        $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
+        $pager->setMaxPerPage(max(5, min(50, (integer) $this->request->query->get('per_page', 20))));
 
-        if (!$showingAll) {
-            $jobs = array_reverse($jobs);
-        }
+        $pagerView = new TwitterBootstrapView();
+        $router = $this->router;
+        $routeGenerator = function($page) use ($router, $pager) {
+            return $router->generate('BCCResqueBundle_failed_list', array('page' => $page, 'per_page' => $pager->getMaxPerPage()));
+        };
+
 
         return $this->render(
             'BCCResqueBundle:Default:failed_list.html.twig',
             array(
-                'jobs' => $jobs,
-                'showingAll' => $showingAll,
+                'resque' => $this->getResque(),
+                'jobPager' => $pager,
+                'jobPagerView' => $pagerView,
+                'jobPagerGenerator' => $routeGenerator,
             )
         );
     }
@@ -120,10 +132,33 @@ class DefaultController extends Controller
 
     public function listScheduledAction()
     {
+        $qb = $this->getEm()->createQueryBuilder();
+        $qb->select('j')->from('BCCResqueBundle:ResqueJob', 'j')
+            ->where($qb->expr()->andX(
+                $qb->expr()->in('j.state', ':state'),
+                $qb->expr()->isNotNull('j.executeAfter')
+            ))
+            ->orderBy('j.id', 'desc');
+        $qb->setParameter('state', array(Job::STATE_PENDING, Job::STATE_NEW, Job::STATE_RUNNING));
+
+        $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
+        $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
+        $pager->setMaxPerPage(max(5, min(50, (integer) $this->request->query->get('per_page', 20))));
+
+        $pagerView = new TwitterBootstrapView();
+        $router = $this->router;
+        $routeGenerator = function($page) use ($router, $pager) {
+            return $router->generate('BCCResqueBundle_scheduled_list', array('page' => $page, 'per_page' => $pager->getMaxPerPage()));
+        };
+
+
         return $this->render(
             'BCCResqueBundle:Default:scheduled_list.html.twig',
             array(
-                'timestamps' => $this->getResque()->getDelayedJobTimestamps()
+                'resque' => $this->getResque(),
+                'jobPager' => $pager,
+                'jobPagerView' => $pagerView,
+                'jobPagerGenerator' => $routeGenerator,
             )
         );
     }
