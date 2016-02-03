@@ -13,11 +13,11 @@
         }
     ],
     "require": {
-        "symfony/framework-bundle": ">=2.0,<3.0",
+        "symfony/framework-bundle": ">=2.0",
         "chrisboulton/php-resque": "dev-master",
         "chrisboulton/php-resque-scheduler": "dev-master",
-        "doctrine/common": ">=2.3,<3.0",
-        "jms/di-extra-bundle": ">=1.1,<2.0"
+        "doctrine/common": ">=2.3",
+        "jms/di-extra-bundle": ">=1.1"
     },
     "require-dev": {
         "pagerfanta/pagerfanta": "dev-master",
