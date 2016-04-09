@@ -1,7 +1,22 @@
 #!/usr/bin/env php
 <?php
 
-require_once __DIR__."/../../../../../autoload.php";
+// Find and initialize Composer
+$files = array(
+    __DIR__. '/../../../../app/autoload.php',
+    __DIR__ . '/../../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+    __DIR__ . '/../../../../autoload.php',
+    __DIR__ . '/../vendor/autoload.php',
+);
+
+$found = false;
+foreach ($files as $file) {
+    if (file_exists($file)) {
+        require_once $file;
+        break;
+    }
+}
 
 // Look for an environment variable with
 $RESQUE_PHP = getenv('RESQUE_PHP');
