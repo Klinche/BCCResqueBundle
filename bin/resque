@@ -6,7 +6,22 @@ if (empty($QUEUE)) {
     die("Set QUEUE env var containing the list of queues to work.\n");
 }
 
-require_once __DIR__."/../../../../../autoload.php";
+// Find and initialize Composer
+$files = array(
+    __DIR__. '/../../../../app/autoload.php',
+    __DIR__ . '/../../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+    __DIR__ . '/../../../../autoload.php',
+    __DIR__ . '/../vendor/autoload.php',
+);
+
+$found = false;
+foreach ($files as $file) {
+    if (file_exists($file)) {
+        require_once $file;
+        break;
+    }
+}
 
 $REDIS_BACKEND    = getenv('REDIS_BACKEND');
 $REDIS_BACKEND_DB = getenv('REDIS_BACKEND_DB');
