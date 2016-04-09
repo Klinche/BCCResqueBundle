@@ -29,7 +29,6 @@
         "symfony/twig-bundle": "Required when using the webinterface."
     },
     "autoload": {
-        "psr-0": { "BCC\\ResqueBundle": "" }
-    },
-    "target-dir": "BCC/ResqueBundle"
+        "psr-4": { "BCC\\ResqueBundle\\": "" }
+    }
 }
