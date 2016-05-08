@@ -2,7 +2,7 @@
 
 namespace BCC\ResqueBundle\Controller;
 
-use JMS\JobQueueBundle\Entity\Job;
+use BCC\ResqueBundle\Entity\ResqueJob;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use JMS\DiExtraBundle\Annotation as DI;
 use Pagerfanta\Adapter\DoctrineORMAdapter;
@@ -93,7 +93,7 @@ class DefaultController extends Controller
         $qb->select('j')->from('BCCResqueBundle:ResqueJob', 'j')
             ->where($qb->expr()->in('j.state', ':state'))
             ->orderBy('j.id', 'desc');
-        $qb->setParameter('state', array(Job::STATE_FAILED, Job::STATE_INCOMPLETE, Job::STATE_CANCELED, Job::STATE_TERMINATED));
+        $qb->setParameter('state', array(ResqueJob::STATE_FAILED));
 
         $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
         $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
@@ -139,7 +139,7 @@ class DefaultController extends Controller
                 $qb->expr()->isNotNull('j.executeAfter')
             ))
             ->orderBy('j.id', 'desc');
-        $qb->setParameter('state', array(Job::STATE_PENDING, Job::STATE_NEW, Job::STATE_RUNNING));
+        $qb->setParameter('state', array(ResqueJob::STATE_PENDING, ResqueJob::STATE_RUNNING));
 
         $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
         $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
