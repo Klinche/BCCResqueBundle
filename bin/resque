@@ -102,23 +102,40 @@ Resque_Event::listen('afterPerform', function(Resque_Job $job) use ($logger) {
 
 
 
-for ($i = 0; $i < $count; ++$i) {
-    $pid = Resque::fork();
-    if ($pid == -1) {
-        $logger->log(Psr\Log\LogLevel::EMERGENCY, 'Could not fork worker {count}', array('count' => $i));
-        die();
-    } else if (!$pid) {
-        // Child, start the worker
-        $queues = explode(',', $QUEUE);
-        $worker = new Resque_Worker($queues);
+if ($count > 1) {
+    for ($i = 0; $i < $count; ++$i) {
+        $pid = Resque::fork();
+        if ($pid == -1) {
+            $logger->log(Psr\Log\LogLevel::EMERGENCY, 'Could not fork worker {count}', array('count' => $i));
+            die();
+        } else if (!$pid) {
+            // Child, start the worker
+            $queues = explode(',', $QUEUE);
+            $worker = new Resque_Worker($queues);
 
-        $aLogger = new \BCC\ResqueBundle\ResqueDBLogger($logLevel, new \BCC\ResqueBundle\Worker($worker));
-        $aLogger->log(Psr\Log\LogLevel::NOTICE, 'Starting worker {worker}', array('worker' => $worker));
-        $worker->setLogger($aLogger);
+            $aLogger = new \BCC\ResqueBundle\ResqueDBLogger($logLevel, new \BCC\ResqueBundle\Worker($worker));
+            $aLogger->log(Psr\Log\LogLevel::NOTICE, 'Starting worker {worker}', array('worker' => $worker));
+            $worker->setLogger($aLogger);
 
-        $worker->work($interval, $BLOCKING);
-        break;
+            $worker->work($interval, $BLOCKING);
+            break;
+        }
     }
+} else {
+    // Start a single worker
+    $queues = explode(',', $QUEUE);
+    $worker = new Resque_Worker($queues);
+    $worker->setLogger($logger);
+    $PIDFILE = getenv('PIDFILE');
+    if ($PIDFILE) {
+        file_put_contents($PIDFILE, getmypid()) or
+        die('Could not write PID information to ' . $PIDFILE);
+    }
+    $aLogger = new \BCC\ResqueBundle\ResqueDBLogger($logLevel, new \BCC\ResqueBundle\Worker($worker));
+    $aLogger->log(Psr\Log\LogLevel::NOTICE, 'Starting worker {worker}', array('worker' => $worker));
+    $worker->setLogger($aLogger);
+
+    $worker->work($interval, $BLOCKING);
 }
 
 /**
