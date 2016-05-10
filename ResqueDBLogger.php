@@ -36,7 +36,7 @@ class ResqueDBLogger extends \Psr\Log\AbstractLogger
 
         if ($this->verbose) {
             $string = '[' . $level . '] [' . strftime('%T %Y-%m-%d') . '] ' . $this->interpolate($message, $context) . PHP_EOL;
-        }else if (!($level === Psr\Log\LogLevel::INFO || $level === Psr\Log\LogLevel::DEBUG)) {
+        }else if (!($level === \Psr\Log\LogLevel::INFO || $level === \Psr\Log\LogLevel::DEBUG)) {
             $string = '[' . $level . '] ' . $this->interpolate($message, $context) . PHP_EOL;
         }
         fwrite(
