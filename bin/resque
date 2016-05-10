@@ -1,155 +1,110 @@
-#!/usr/bin/env php
 <?php
 
-$QUEUE = getenv('QUEUE');
-if (empty($QUEUE)) {
-    die("Set QUEUE env var containing the list of queues to work.\n");
-}
+namespace BCC\ResqueBundle\Command;
 
-require_once __DIR__."/../../../../../autoload.php";
+use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Process\Process;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
 
-$REDIS_BACKEND    = getenv('REDIS_BACKEND');
-$REDIS_BACKEND_DB = getenv('REDIS_BACKEND_DB');
-if (!empty($REDIS_BACKEND)) {
-    if (empty($REDIS_BACKEND_DB)) {
-        Resque::setBackend($REDIS_BACKEND);
-    } else {
-        Resque::setBackend($REDIS_BACKEND, $REDIS_BACKEND_DB);
-    }
-}
-
-$logLevel = false;
-$LOGGING  = getenv('LOGGING');
-$VERBOSE  = getenv('VERBOSE');
-$VVERBOSE = getenv('VVERBOSE');
-if (!empty($LOGGING) || !empty($VERBOSE)) {
-    $logLevel = true;
-} else if (!empty($VVERBOSE)) {
-    $logLevel = true;
-}
-
-$APP_INCLUDE = getenv('APP_INCLUDE');
-if ($APP_INCLUDE) {
-    if (!file_exists($APP_INCLUDE)) {
-        die('APP_INCLUDE ('.$APP_INCLUDE.") does not exist.\n");
+class StartScheduledWorkerCommand extends ContainerAwareCommand
+{
+    protected function configure()
+    {
+        $this
+            ->setName('bcc:resque:scheduledworker-start')
+            ->setDescription('Start a bcc scheduled resque worker')
+            ->addOption('foreground', 'f', InputOption::VALUE_NONE, 'Should the worker run in foreground')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'Force creation of a new worker if the PID file exists')
+            ->addOption('interval', 'i', InputOption::VALUE_REQUIRED, 'How often to check for new jobs across the queues', 5)
+        ;
     }
 
-    require_once $APP_INCLUDE;
-}
+    protected function execute(InputInterface $input, OutputInterface $output)
+    {
+        $pidFile=$this->getContainer()->get('kernel')->getCacheDir().'/bcc_resque_scheduledworker.pid';
+        if (file_exists($pidFile) && !$input->getOption('force')) {
+            throw new \Exception('PID file exists - use --force to override');
+        }
 
-// See if the APP_INCLUDE containes a logger object,
-// If none exists, fallback to internal logger
-if (!isset($logger) || !is_object($logger)) {
-    $logger = new Resque_Log($logLevel);
-}
+        if (file_exists($pidFile)) {
+            unlink($pidFile);
+        }
 
-$BLOCKING = getenv('BLOCKING') !== FALSE;
+        $env = array(
+            'APP_INCLUDE' => $this->getContainer()->getParameter('kernel.root_dir').'/bootstrap.php.cache',
+            'VVERBOSE'    => 1,
+            'RESQUE_PHP'  => $this->getContainer()->getParameter('bcc_resque.resque.vendor_dir').'/chrisboulton/php-resque/lib/Resque.php',
+            'INTERVAL'    => $input->getOption('interval'),
+        );
 
-$interval = 5;
-$INTERVAL = getenv('INTERVAL');
-if (!empty($INTERVAL)) {
-    $interval = $INTERVAL;
-}
+        $prefix = $this->getContainer()->getParameter('bcc_resque.prefix');
+        if (!empty($prefix)) {
+            $env['PREFIX'] = $this->getContainer()->getParameter('bcc_resque.prefix');
+        }
 
-$count = 1;
-$COUNT = getenv('COUNT');
-if (!empty($COUNT) && $COUNT > 1) {
-    $count = $COUNT;
-}
+        $redisHost = $this->getContainer()->getParameter('bcc_resque.resque.redis.host');
+        $redisPort = $this->getContainer()->getParameter('bcc_resque.resque.redis.port');
+        $redisDatabase = $this->getContainer()->getParameter('bcc_resque.resque.redis.database');
+        if ($redisHost != null && $redisPort != null) {
+            $env['REDIS_BACKEND'] = $redisHost.':'.$redisPort;
+        }
+        if (isset($redisDatabase)) {
+            $env['REDIS_BACKEND_DB'] = $redisDatabase;
+        }
 
-$PREFIX = getenv('PREFIX');
-if (!empty($PREFIX)) {
-    $logger->log(Psr\Log\LogLevel::INFO, 'Prefix set to {prefix}', array('prefix' => $PREFIX));
-    Resque_Redis::prefix($PREFIX);
-}
+        if (version_compare(PHP_VERSION, '5.4.0') >= 0) {
+            $phpExecutable = PHP_BINARY;
+        } else {
+            $phpExecutable = PHP_BINDIR.'/php';
+            if (defined('PHP_WINDOWS_VERSION_BUILD')) {
+                $phpExecutable = 'php';
+            }
+        }
 
-// If set, re-attach failed jobs based on retry_strategy
-Resque_Event::listen('onFailure', function(Exception $exception, Resque_Job $job) use ($logger) {
-    $args = $job->getArguments();
-    $resque = getBCCResqueManager($args);
-    $resque->onFailure($exception, $job);
-});
+        $workerCommand = $phpExecutable.' '.__DIR__.'/../bin/resque-scheduler';
 
-// If set, re-attach failed jobs based on retry_strategy
-Resque_Event::listen('beforePerform', function(Resque_Job $job) use ($logger) {
-    $args = $job->getArguments();
-    $resque = getBCCResqueManager($args);
-    $resque->beforePerform($job);
-});
+        if (!$input->getOption('foreground')) {
+            $logFile = $this->getContainer()->getParameter(
+                'kernel.logs_dir'
+            ) . '/resque-scheduler_' . $this->getContainer()->getParameter('kernel.environment') . '.log';
+            $workerCommand = 'nohup ' . $workerCommand . ' > ' . $logFile .' 2>&1 & echo $!';
+        }
 
-// If set, re-attach failed jobs based on retry_strategy
-Resque_Event::listen('afterPerform', function(Resque_Job $job) use ($logger) {
-    $args = $job->getArguments();
-    $resque = getBCCResqueManager($args);
-    $resque->afterPerform($job);
-});
-
-
+		// In windows: When you pass an environment to CMD it replaces the old environment
+		// That means we create a lot of problems with respect to user accounts and missing vars
+		// this is a workaround where we add the vars to the existing environment.
+		if (defined('PHP_WINDOWS_VERSION_BUILD'))
+		{
+			foreach($env as $key => $value)
+			{
+				putenv($key."=". $value);
+			}
+			$env = null;
+		}
 
 
-if ($count > 1) {
-    for ($i = 0; $i < $count; ++$i) {
-        $pid = Resque::fork();
-        if ($pid == -1) {
-            $logger->log(Psr\Log\LogLevel::EMERGENCY, 'Could not fork worker {count}', array('count' => $i));
-            die();
-        } else if (!$pid) {
-            // Child, start the worker
-            $queues = explode(',', $QUEUE);
-            $worker = new Resque_Worker($queues);
-            $worker->setLogger($logger);
-            $logger->log(Psr\Log\LogLevel::NOTICE, 'Starting worker {worker}', array('worker' => $worker));
-            $worker->work($interval, $BLOCKING);
-            break;
+        $process = new Process($workerCommand, null, $env, null, null);
+
+        $output->writeln(\sprintf('Starting worker <info>%s</info>', $process->getCommandLine()));
+
+        if ($input->getOption('foreground')) {
+            $process->run(function ($type, $buffer) use ($output) {
+                    $output->write($buffer);
+                });
+        }
+        // else we recompose and display the worker id
+        else {
+            $process->run();
+            $pid = \trim($process->getOutput());
+            if (function_exists('gethostname')) {
+                $hostname = gethostname();
+            } else {
+                $hostname = php_uname('n');
+            }
+            $output->writeln(\sprintf('<info>Worker started</info> %s:%s', $hostname, $pid));
+            file_put_contents($pidFile,$pid);
         }
     }
-} else {
-    // Start a single worker
-    $queues = explode(',', $QUEUE);
-    $worker = new Resque_Worker($queues);
-    $worker->setLogger($logger);
-
-    $PIDFILE = getenv('PIDFILE');
-    if ($PIDFILE) {
-        file_put_contents($PIDFILE, getmypid()) or
-            die('Could not write PID information to ' . $PIDFILE);
-    }
-
-    $logger->log(Psr\Log\LogLevel::NOTICE, 'Starting worker {worker}', array('worker' => $worker));
-    $worker->work($interval, $BLOCKING);
-}
-
-/**
- * @return KernelInterface
- */
-function createKernel($args)
-{
-    $finder = new Symfony\Component\Finder\Finder();
-    $finder->name('*Kernel.php')->depth(0)->in($args['kernel.root_dir']);
-    $results = iterator_to_array($finder);
-    $file = current($results);
-    $class = $file->getBasename('.php');
-
-    require_once $file;
-
-    return new $class(
-        isset($args['kernel.environment']) ? $args['kernel.environment'] : 'dev',
-        isset($args['kernel.debug']) ? $args['kernel.debug'] : true
-    );
-}
-
-/**
- * @param $args
- * @return \BCC\ResqueBundle\Resque
- */
-function getBCCResqueManager($args) {
-
-    $kernel = null;
-
-    if ($kernel === null) {
-        $kernel = createKernel($args);
-        $kernel->boot();
-    }
-
-    return $kernel->getContainer()->get('bcc_resque.resque');
 }
