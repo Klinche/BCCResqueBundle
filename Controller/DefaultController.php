@@ -20,9 +20,6 @@ class DefaultController extends Controller
     private $registry;
 
     /** @DI\Inject */
-    private $request;
-
-    /** @DI\Inject */
     private $router;
 
     public function indexAction()
@@ -37,7 +34,7 @@ class DefaultController extends Controller
         );
     }
 
-    public function listDatabaseAction()
+    public function listDatabaseAction(Request $request)
     {
         $qb = $this->getEm()->createQueryBuilder();
         $qb->select('j')->from('BCCResqueBundle:ResqueJob', 'j')
@@ -45,8 +42,8 @@ class DefaultController extends Controller
             ->orderBy('j.id', 'desc');
 
         $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
-        $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
-        $pager->setMaxPerPage(max(5, min(50, (integer) $this->request->query->get('per_page', 20))));
+        $pager->setCurrentPage(max(1, (integer) $request->query->get('page', 1)));
+        $pager->setMaxPerPage(max(5, min(50, (integer) $request->query->get('per_page', 20))));
 
         $pagerView = new TwitterBootstrapView();
         $router = $this->router;
@@ -87,7 +84,7 @@ class DefaultController extends Controller
         );
     }
 
-    public function listFailedAction()
+    public function listFailedAction(Request $request)
     {
         $qb = $this->getEm()->createQueryBuilder();
         $qb->select('j')->from('BCCResqueBundle:ResqueJob', 'j')
@@ -96,8 +93,8 @@ class DefaultController extends Controller
         $qb->setParameter('state', array(ResqueJob::STATE_FAILED));
 
         $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
-        $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
-        $pager->setMaxPerPage(max(5, min(50, (integer) $this->request->query->get('per_page', 20))));
+        $pager->setCurrentPage(max(1, (integer) $request->query->get('page', 1)));
+        $pager->setMaxPerPage(max(5, min(50, (integer) $request->query->get('per_page', 20))));
 
         $pagerView = new TwitterBootstrapView();
         $router = $this->router;
@@ -130,7 +127,7 @@ class DefaultController extends Controller
     }
 
 
-    public function listScheduledAction()
+    public function listScheduledAction(Request $request)
     {
         $qb = $this->getEm()->createQueryBuilder();
         $qb->select('j')->from('BCCResqueBundle:ResqueJob', 'j')
@@ -142,8 +139,8 @@ class DefaultController extends Controller
         $qb->setParameter('state', array(ResqueJob::STATE_PENDING, ResqueJob::STATE_RUNNING));
 
         $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
-        $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
-        $pager->setMaxPerPage(max(5, min(50, (integer) $this->request->query->get('per_page', 20))));
+        $pager->setCurrentPage(max(1, (integer) $request->query->get('page', 1)));
+        $pager->setMaxPerPage(max(5, min(50, (integer) $request->query->get('per_page', 20))));
 
         $pagerView = new TwitterBootstrapView();
         $router = $this->router;
