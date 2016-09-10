@@ -198,7 +198,9 @@ class DefaultController extends Controller
         $start = -100;
         $count = -1;
 
-        if ($this->getRequest()->query->has('all')) {
+        $request = Request::createFromGlobals();
+
+        if ($request->query->has('all')) {
             $start = 0;
             $count = -1;
             $showingAll = true;
