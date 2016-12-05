@@ -70,6 +70,10 @@ class Resque
         return $this->redisConfiguration;
     }
 
+    /**
+     * @param Job $job
+     * @return ResqueJob
+     */
     public function enqueue(Job $job)
     {
         if ($job instanceof ContainerAwareJob) {
@@ -95,6 +99,11 @@ class Resque
         return $resqueJob;
     }
 
+    /**
+     * @param Job $job
+     * @param bool $trackStatus
+     * @return ResqueJob|null
+     */
     public function enqueueOnce(Job $job, $trackStatus = false)
     {
         $queue = new Queue($job->queue);
@@ -111,6 +120,11 @@ class Resque
         return $this->enqueue($job, $trackStatus);
     }
 
+    /**
+     * @param $at
+     * @param Job $job
+     * @return ResqueJob
+     */
     public function enqueueAt($at,Job $job)
     {
         if ($job instanceof ContainerAwareJob) {
@@ -132,6 +146,11 @@ class Resque
         return $resqueJob;
     }
 
+    /**
+     * @param $in
+     * @param Job $job
+     * @return ResqueJob
+     */
     public function enqueueIn($in,Job $job)
     {
         if ($job instanceof ContainerAwareJob) {
@@ -140,7 +159,7 @@ class Resque
 
         $this->attachRetryStrategy($job);
 
-        $resqueJob = new ResqueJob($job, time() + $in);
+        $resqueJob = new ResqueJob($job->getBCCJobId(), \get_class($job), $job->queue, $job->args, time() + $in);
 
         $em = $this->registry->getManagerForClass('BCCResqueBundle:ResqueJob');
 
@@ -149,7 +168,7 @@ class Resque
 
         \ResqueScheduler::enqueueIn($in, $job->queue, \get_class($job), $job->args);
 
-        return null;
+        return $resqueJob;
     }
 
     public function removedDelayed(Job $job)
